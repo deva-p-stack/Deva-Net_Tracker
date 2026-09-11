@@ -1,0 +1,2611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deva NET Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<!-- Practice Mode: Upload Answer Key — client-side PDF parsing + OCR (isolated feature, does not touch existing code) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+<style>
+  :root{
+    --bg-1:#f6f2fb;
+    --bg-2:#ece2f7;
+    --blob-a:#7c3aed;
+    --blob-a-op:.18;
+    --blob-b:#c9a227;
+    --blob-b-op:.14;
+
+    --glass:rgba(255,255,255,.66);
+    --glass-strong:rgba(255,255,255,.88);
+    --glass-border:rgba(255,255,255,.85);
+    --glass-blur:18px;
+
+    --ink:#1e1333;
+    --muted:#5f5271;
+    --line:rgba(30,19,51,.12);
+
+    --accent:#7c3aed;
+    --accent-2:#5b21b6;
+    --accent-soft:rgba(124,58,237,.14);
+    --gold:#a8791a;
+    --gold-soft:rgba(168,121,26,.14);
+
+    --right:#147a4a;
+    --right-bg:rgba(20,122,74,.14);
+    --wrong:#ad3620;
+    --wrong-bg:rgba(173,54,32,.14);
+
+    --shadow:0 12px 34px rgba(124,58,237,.18);
+    --shadow-sm:0 4px 14px rgba(124,58,237,.12);
+  }
+
+  [data-theme="dark"]{
+    --bg-1:#120a1f;
+    --bg-2:#160e26;
+    --blob-a:#a78bfa;
+    --blob-a-op:.16;
+    --blob-b:#e0c88f;
+    --blob-b-op:.09;
+
+    --glass:rgba(255,255,255,.055);
+    --glass-strong:rgba(255,255,255,.09);
+    --glass-border:rgba(255,255,255,.14);
+    --glass-blur:20px;
+
+    --ink:#f1ecfb;
+    --muted:#b3a2cc;
+    --line:rgba(255,255,255,.10);
+
+    --accent:#a78bfa;
+    --accent-2:#8b5cf6;
+    --accent-soft:rgba(167,139,250,.16);
+    --gold:#e0c88f;
+    --gold-soft:rgba(224,200,143,.12);
+
+    --right:#35cd8d;
+    --right-bg:rgba(53,205,141,.15);
+    --wrong:#e97a5c;
+    --wrong-bg:rgba(233,122,92,.15);
+
+    --shadow:0 14px 38px rgba(0,0,0,.5);
+    --shadow-sm:0 4px 14px rgba(0,0,0,.4);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  html{scroll-behavior:smooth;scrollbar-color:var(--accent) transparent;}
+  ::-webkit-scrollbar{width:11px;height:11px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{
+    background:linear-gradient(180deg,var(--accent),var(--gold));
+    border-radius:99px;
+    border:2px solid var(--bg-1);
+    background-clip:padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,var(--accent-2),var(--gold));background-clip:padding-box;}
+  body{
+    margin:0;
+    font-family:'Manrope', Arial, sans-serif;
+    color:var(--ink);
+    background:linear-gradient(180deg,var(--bg-1),var(--bg-2));
+    transition:background .25s ease, color .25s ease;
+    position:relative;
+    overflow-x:hidden;
+    min-height:100vh;
+  }
+  body::before,
+  body::after{
+    content:"";
+    position:fixed;
+    width:520px;
+    height:520px;
+    border-radius:50%;
+    filter:blur(90px);
+    z-index:0;
+    pointer-events:none;
+    transition:background .25s ease, opacity .25s ease;
+  }
+  body::before{
+    top:-160px;
+    left:-140px;
+    background:var(--blob-a);
+    opacity:var(--blob-a-op);
+    animation:floatBlobA 16s ease-in-out infinite;
+  }
+  body::after{
+    bottom:-180px;
+    right:-160px;
+    background:var(--blob-b);
+    opacity:var(--blob-b-op);
+    animation:floatBlobB 20s ease-in-out infinite;
+  }
+  @keyframes floatBlobA{
+    0%,100%{transform:translate(0,0) scale(1);}
+    50%{transform:translate(40px,50px) scale(1.08);}
+  }
+  @keyframes floatBlobB{
+    0%,100%{transform:translate(0,0) scale(1);}
+    50%{transform:translate(-35px,-40px) scale(1.06);}
+  }
+
+  .glass{
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+  }
+
+  /* Navbar */
+  .navbar{
+    position:sticky;
+    top:0;
+    z-index:20;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 22px;
+    background:var(--glass-strong);
+    border-bottom:1px solid var(--glass-border);
+    backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+    box-shadow:var(--shadow-sm);
+    flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:11px;}
+  .brand-mark{
+    height:34px;padding:0 16px;border-radius:20px;
+    background:linear-gradient(120deg,var(--accent),var(--gold),var(--accent-2),var(--accent));
+    background-size:300% 100%;
+    animation:shimmerBrand 6s ease infinite;
+    color:#f4fbfa;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Manrope',sans-serif;
+    font-weight:800;font-size:.82rem;letter-spacing:.3px;flex-shrink:0;
+    box-shadow:0 4px 12px rgba(124,58,237,.3);
+  }
+  [data-theme="dark"] .brand-mark{color:#08131a;}
+  @keyframes shimmerBrand{
+    0%{background-position:0% 50%;}
+    50%{background-position:100% 50%;}
+    100%{background-position:0% 50%;}
+  }
+  .brand-name{
+    font-family:'Fraunces',serif;
+    font-size:1.08rem;
+    font-weight:600;
+    letter-spacing:.1px;
+  }
+  .nav-links{display:flex;align-items:center;gap:8px;margin-left:auto;}
+  .nav-link{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--muted);
+    padding:7px 15px;
+    border-radius:20px;
+    font-size:.82rem;
+    font-weight:700;
+    font-family:'Manrope',sans-serif;
+    cursor:pointer;
+    transition:background .18s, color .18s, border-color .18s, box-shadow .18s, transform .15s;
+  }
+  .nav-link:hover{color:var(--ink);border-color:var(--accent);transform:translateY(-1px);}
+  .nav-link.active{
+    background:linear-gradient(120deg,var(--accent),var(--accent-2));
+    color:#f4fbfa;
+    border-color:var(--accent);
+    box-shadow:0 4px 14px var(--accent-soft);
+  }
+  [data-theme="dark"] .nav-link.active{color:#08131a;}
+  .nav-link-full{
+    border-color:var(--gold);
+    color:var(--gold);
+    position:relative;
+  }
+  .nav-link-full:hover{border-color:var(--gold);color:var(--gold);}
+  .nav-link-full::after{
+    content:"3H";
+    position:absolute;
+    top:-8px;
+    right:-6px;
+    background:var(--gold);
+    color:#2a1c00;
+    font-size:.58rem;
+    font-weight:800;
+    padding:1px 5px;
+    border-radius:8px;
+    letter-spacing:.3px;
+    box-shadow:0 2px 6px rgba(0,0,0,.2);
+  }
+  .nav-link-full.active{
+    background:linear-gradient(120deg,var(--gold),#d9a441);
+    border-color:var(--gold);
+    color:#2a1c00;
+    box-shadow:0 4px 14px var(--gold-soft);
+  }
+  [data-theme="dark"] .nav-link-full.active{color:#241800;}
+  .theme-toggle{
+    display:flex;align-items:center;gap:8px;
+    background:var(--glass);
+    border:1px solid var(--line);
+    border-radius:20px;
+    padding:6px 13px;
+    cursor:pointer;
+    color:var(--ink);
+    font-size:.8rem;
+    font-weight:700;
+  }
+  .theme-toggle:hover{border-color:var(--accent);}
+  .theme-toggle .icon{font-size:1rem;line-height:1;display:inline-block;transition:transform .4s cubic-bezier(.34,1.56,.64,1);}
+  .theme-toggle:active .icon{transform:rotate(180deg) scale(.85);}
+
+  main{
+    max-width:680px;
+    margin:0 auto;
+    padding:22px 16px 44px;
+    position:relative;
+    z-index:1;
+  }
+
+  @keyframes fadeSlideUp{
+    from{opacity:0;transform:translateY(14px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+  .intro,
+  .timer-panel,
+  .score-card,
+  .sheet{
+    animation:fadeSlideUp .55s cubic-bezier(.22,.9,.3,1) both;
+  }
+  .intro{animation-delay:.02s;}
+  .timer-panel{animation-delay:.08s;}
+  .score-card{animation-delay:.22s;}
+  .sheet{animation-delay:.28s;}
+  .summary-card:nth-child(1){animation:fadeSlideUp .5s .18s cubic-bezier(.22,.9,.3,1) both;}
+  .summary-card:nth-child(2){animation:fadeSlideUp .5s .24s cubic-bezier(.22,.9,.3,1) both;}
+  .summary-card:nth-child(3){animation:fadeSlideUp .5s .30s cubic-bezier(.22,.9,.3,1) both;}
+
+  .intro{text-align:center;margin-bottom:18px;}
+  .intro p{margin:0;color:var(--muted);font-size:.9rem;}
+
+  /* ---------- Timer panel ---------- */
+  .timer-panel{
+    border-radius:16px;
+    padding:18px 20px 20px;
+    margin-bottom:20px;
+    box-shadow:var(--shadow);
+    transition:box-shadow .4s ease, transform .3s ease;
+    position:relative;
+    overflow:hidden;
+  }
+  .timer-panel::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    padding:1px;
+    border-radius:16px;
+    background:linear-gradient(120deg,var(--accent),transparent 40%,transparent 60%,var(--gold));
+    -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite:xor;
+    mask-composite:exclude;
+    opacity:0;
+    transition:opacity .5s ease;
+    pointer-events:none;
+  }
+  .timer-panel.is-live::before{
+    opacity:1;
+    animation:panelGlowSpin 5s linear infinite;
+  }
+  .timer-panel.is-live{
+    box-shadow:var(--shadow), 0 0 0 1px var(--accent-soft), 0 0 30px var(--accent-soft);
+  }
+  @keyframes panelGlowSpin{
+    0%{background:linear-gradient(0deg,var(--accent),transparent 40%,transparent 60%,var(--gold));}
+    50%{background:linear-gradient(180deg,var(--accent),transparent 40%,transparent 60%,var(--gold));}
+    100%{background:linear-gradient(360deg,var(--accent),transparent 40%,transparent 60%,var(--gold));}
+  }
+  .timer-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+  .timer-status{
+    font-size:.78rem;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.6px;
+    color:var(--muted);
+  }
+  .timer-status.is-running{color:var(--right);}
+  .timer-status.is-paused{color:var(--gold);}
+  .timer-status.is-ended{color:var(--wrong);}
+  .full-test-badge{
+    display:inline-block;
+    font-size:.68rem;
+    font-weight:800;
+    letter-spacing:.5px;
+    color:#f4fbfa;
+    background:linear-gradient(120deg,var(--accent),var(--accent-2));
+    padding:5px 10px;
+    border-radius:20px;
+    box-shadow:0 3px 10px var(--accent-soft);
+    transition:background .25s ease, box-shadow .25s ease, color .25s ease;
+    white-space:nowrap;
+  }
+  [data-theme="dark"] .full-test-badge{color:#08131a;}
+  .full-test-badge.p2{
+    background:linear-gradient(120deg,var(--accent-2),var(--accent));
+    box-shadow:0 3px 10px var(--accent-soft);
+  }
+  .full-test-badge.full{
+    background:linear-gradient(120deg,var(--gold),#d9a441);
+    color:#2a1c00;
+    box-shadow:0 3px 10px var(--gold-soft);
+  }
+  [data-theme="dark"] .full-test-badge.full{color:#241800;}
+
+  .timer-display{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:3rem;
+    line-height:1;
+    letter-spacing:.5px;
+    color:var(--ink);
+    text-align:center;
+    margin:4px 0 14px;
+    transition:color .2s ease;
+  }
+  .timer-display.urgent{
+    color:var(--wrong);
+    animation:pulseTime 1s ease-in-out infinite;
+  }
+  @keyframes pulseTime{
+    0%,100%{opacity:1;}
+    50%{opacity:.55;}
+  }
+
+  .timer-progress{
+    height:6px;
+    width:100%;
+    border-radius:99px;
+    background:var(--line);
+    overflow:hidden;
+    margin-bottom:16px;
+  }
+  .timer-progress-bar{
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg,var(--accent),var(--gold));
+    border-radius:99px;
+    transition:width 1s linear, background .3s ease;
+  }
+  .timer-progress-bar.urgent{background:linear-gradient(90deg,var(--wrong),var(--gold));}
+
+  .duration-row{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+  .duration-label{
+    font-size:.78rem;
+    font-weight:700;
+    color:var(--muted);
+    letter-spacing:.2px;
+  }
+  .duration-select{
+    -webkit-appearance:none;
+    appearance:none;
+    background:var(--glass-strong);
+    border:1px solid var(--line);
+    color:var(--ink);
+    padding:9px 34px 9px 16px;
+    border-radius:12px;
+    font-size:.88rem;
+    font-weight:700;
+    font-family:'Manrope',sans-serif;
+    cursor:pointer;
+    background-image:linear-gradient(45deg, transparent 50%, var(--accent) 50%), linear-gradient(135deg, var(--accent) 50%, transparent 50%);
+    background-position:calc(100% - 18px) center, calc(100% - 12px) center;
+    background-size:6px 6px, 6px 6px;
+    background-repeat:no-repeat;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .duration-select:hover:not(:disabled){border-color:var(--accent);}
+  .duration-select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .duration-select:disabled{opacity:.5;cursor:not-allowed;}
+
+  .timer-controls{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .timer-btn{
+    border:1px solid var(--line);
+    padding:10px 20px;
+    border-radius:12px;
+    font-size:.85rem;
+    font-weight:800;
+    font-family:'Manrope',sans-serif;
+    letter-spacing:.2px;
+    cursor:pointer;
+    transition:background .15s, border-color .15s, transform .12s, opacity .15s;
+    min-width:108px;
+  }
+  .timer-btn:hover:not(:disabled){transform:translateY(-2px);}
+  .timer-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+  .timer-btn.start{background:var(--accent);border-color:var(--accent);color:#f4fbfa;}
+  [data-theme="dark"] .timer-btn.start{color:#08131a;}
+  .timer-btn.pause{background:var(--gold-soft);border-color:var(--gold);color:var(--gold);}
+  .timer-btn.end{background:var(--wrong-bg);border-color:var(--wrong);color:var(--wrong);}
+  .timer-btn.infinite{
+    background:var(--accent-soft);
+    border-color:var(--accent);
+    color:var(--accent);
+    min-width:auto;
+    padding:9px 18px;
+  }
+  .timer-btn.infinite.is-active{
+    background:var(--accent);
+    color:#f4fbfa;
+  }
+  [data-theme="dark"] .timer-btn.infinite.is-active{color:#08131a;}
+
+  /* ---------- Summary ---------- */
+  .summary{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:10px;
+    margin-bottom:14px;
+    perspective:800px;
+  }
+  .summary-card{
+    border-radius:14px;
+    padding:15px 8px;
+    text-align:center;
+    box-shadow:var(--shadow-sm);
+    cursor:default;
+    transition:transform .12s ease-out, box-shadow .25s ease, border-color .25s ease;
+    transform-style:preserve-3d;
+    will-change:transform;
+  }
+  .summary-card:hover{box-shadow:var(--shadow);}
+  .summary-card.right:hover{border-color:var(--right);}
+  .summary-card.wrong:hover{border-color:var(--wrong);}
+  .summary-card.pending:hover{border-color:var(--accent);}
+  .summary-card .num{
+    font-family:'Fraunces',serif;
+    font-size:1.9rem;
+    font-weight:600;
+    display:block;
+    transform:translateZ(18px);
+  }
+  .summary-card .lbl{
+    font-size:.74rem;
+    color:var(--muted);
+    letter-spacing:.3px;
+    font-weight:700;
+    transform:translateZ(12px);
+    display:block;
+  }
+  .summary-card.right .num{color:var(--right);}
+  .summary-card.wrong .num{color:var(--wrong);}
+  .summary-card.pending .num{color:var(--accent);}
+
+  /* ---------- Score card ---------- */
+  .score-card{
+    border-radius:16px;
+    padding:18px 20px;
+    margin-bottom:20px;
+    box-shadow:var(--shadow);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+    background:linear-gradient(120deg, var(--accent-soft), var(--gold-soft));
+    border:1px solid var(--glass-border);
+  }
+  .score-info{display:flex;flex-direction:column;gap:2px;}
+  .score-title{
+    font-size:.76rem;
+    font-weight:800;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .score-sub{
+    font-size:.8rem;
+    color:var(--muted);
+    font-weight:600;
+  }
+  .score-value{
+    font-family:'Fraunces',serif;
+    font-size:2.3rem;
+    font-weight:700;
+    color:var(--accent);
+    white-space:nowrap;
+  }
+  .score-value small{
+    font-family:'Manrope',sans-serif;
+    font-size:1.1rem;
+    font-weight:700;
+    color:var(--muted);
+  }
+
+  /* ---------- Question sheet ---------- */
+  .sheet{
+    border-radius:16px;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+  .col-head{
+    display:grid;
+    grid-template-columns:60px 1fr 68px 68px;
+    padding:13px 16px;
+    background:linear-gradient(120deg,var(--accent),var(--accent-2));
+    color:#f4fbfa;
+    font-size:.76rem;
+    font-weight:800;
+    letter-spacing:.4px;
+  }
+  [data-theme="dark"] .col-head{color:#08131a;}
+  .col-head span:not(:first-child){text-align:center;}
+  .col-head span:nth-child(2){text-align:left;}
+
+  .sheet-body{position:relative;}
+
+  .q-row{
+    display:grid;
+    grid-template-columns:60px 1fr 68px 68px;
+    align-items:center;
+    padding:10px 16px;
+    border-bottom:1px solid var(--line);
+    transition:background .15s;
+  }
+  .q-row:last-child{border-bottom:none;}
+  .q-row:nth-child(even){background:rgba(15,110,106,.045);}
+  .q-row.marked-right{background:var(--right-bg);}
+  .q-row.marked-wrong{background:var(--wrong-bg);}
+  .q-num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:32px;height:32px;border-radius:9px;
+    background:var(--glass);
+    border:1px solid var(--line);
+    font-size:.76rem;font-weight:800;color:var(--accent);
+    font-family:'Manrope',sans-serif;
+  }
+  .q-row.marked-right .q-num{border-color:var(--right);color:var(--right);}
+  .q-row.marked-wrong .q-num{border-color:var(--wrong);color:var(--wrong);}
+  .q-label{font-size:.9rem;font-weight:700;}
+  .chk-cell{display:flex;justify-content:center;}
+
+  input[type="checkbox"]{
+    -webkit-appearance:none;appearance:none;
+    width:23px;height:23px;border-radius:7px;
+    border:2px solid var(--line);
+    background:var(--glass);
+    cursor:pointer;position:relative;
+    transition:border-color .15s, background .15s, transform .1s, opacity .15s;
+  }
+  input[type="checkbox"]:hover:not(:disabled){transform:scale(1.08);}
+  input[type="checkbox"]:active:not(:disabled){transform:scale(.94);}
+  input[type="checkbox"]:disabled{cursor:not-allowed;opacity:.4;}
+  input.right-box:checked{background:var(--right);border-color:var(--right);}
+  input.wrong-box:checked{background:var(--wrong);border-color:var(--wrong);}
+  input[type="checkbox"]:checked::after{
+    content:"";position:absolute;left:6px;top:2px;
+    width:6px;height:11px;
+    border:solid #fff;border-width:0 2px 2px 0;
+    transform:rotate(40deg);
+  }
+
+  .lock-overlay{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    text-align:center;
+    padding:26px;
+    background:rgba(255,255,255,.72);
+    animation:fadeInLock .25s ease;
+  }
+  [data-theme="dark"] .lock-overlay{background:rgba(10,15,26,.72);}
+  @keyframes fadeInLock{
+    from{opacity:0;}
+    to{opacity:1;}
+  }
+  .lock-badge{
+    width:46px;height:46px;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--glass-strong);
+    border:1px solid var(--glass-border);
+    box-shadow:var(--shadow-sm);
+    font-size:1.25rem;
+  }
+  .lock-text{
+    font-size:.9rem;
+    font-weight:700;
+    color:var(--ink);
+    max-width:320px;
+    background:var(--glass-strong);
+    border:1px solid var(--glass-border);
+    padding:8px 16px;
+    border-radius:12px;
+    box-shadow:var(--shadow-sm);
+  }
+
+  /* ---------- Reset ---------- */
+  .actions{margin-top:16px;}
+  .actions button{
+    width:100%;
+    background:var(--glass);
+    border:1px solid var(--line);
+    color:var(--ink);
+    padding:13px 14px;
+    border-radius:12px;
+    font-size:.9rem;
+    font-weight:800;
+    font-family:'Manrope',sans-serif;
+    cursor:pointer;
+    transition:background .15s, border-color .15s, color .15s;
+  }
+  .actions button:hover{background:var(--wrong-bg);border-color:var(--wrong);color:var(--wrong);}
+
+  .site-footer{
+    width:100%;
+    margin-top:30px;
+    background:var(--glass-strong);
+    border-top:1px solid var(--glass-border);
+    backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+    box-shadow:0 -4px 14px rgba(124,58,237,.1);
+    position:relative;
+    z-index:1;
+    opacity:0;
+    transform:translateY(24px);
+    transition:opacity .7s cubic-bezier(.22,.9,.3,1), transform .7s cubic-bezier(.22,.9,.3,1);
+  }
+  .site-footer.in-view{
+    opacity:1;
+    transform:translateY(0);
+  }
+  .footer-inner{
+    max-width:680px;
+    margin:0 auto;
+    padding:26px 22px 30px;
+  }
+  .about-me{
+    margin-bottom:20px;
+    padding-bottom:20px;
+    border-bottom:1px solid var(--line);
+  }
+  .about-me h3{
+    margin:0 0 10px;
+    font-family:'Fraunces',serif;
+    font-size:1.2rem;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .about-me p{
+    margin:0 0 10px;
+    color:var(--muted);
+    font-size:.88rem;
+    line-height:1.65;
+  }
+  .about-me p:last-child{margin-bottom:0;}
+  .about-me strong{color:var(--accent);font-weight:700;}
+  .footer-bottom{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:12px;flex-wrap:wrap;
+  }
+  footer .quote{
+    margin:0;font-size:.8rem;color:var(--muted);
+    font-family:'Fraunces',serif;font-style:italic;
+    text-align:left;transition:color .15s, transform .15s;cursor:default;
+  }
+  footer .quote:hover{color:var(--accent);transform:translateX(2px);}
+  .social-links{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+  .social-icon{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:36px;height:36px;color:var(--ink);
+    border:1px solid var(--line);border-radius:50%;
+    background:var(--glass);
+    transition:border-color .15s, color .15s, transform .15s, background .15s, box-shadow .15s;
+  }
+  .social-icon:hover{
+    border-color:var(--accent);color:#f4fbfa;background:var(--accent);
+    transform:translateY(-3px);
+    box-shadow:0 8px 18px rgba(15,110,106,.35);
+  }
+  [data-theme="dark"] .social-icon:hover{
+    color:#08131a;
+    box-shadow:0 8px 18px rgba(63,220,194,.35);
+  }
+
+  /* ---------- Scroll to top ---------- */
+  .scroll-top-btn{
+    position:fixed;
+    right:20px;
+    bottom:24px;
+    width:46px;height:46px;
+    border-radius:50%;
+    border:1px solid var(--glass-border);
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#f4fbfa;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    box-shadow:0 8px 22px rgba(124,58,237,.35);
+    opacity:0;
+    visibility:hidden;
+    transform:translateY(12px) scale(.9);
+    transition:opacity .3s ease, transform .3s ease, visibility .3s, box-shadow .2s ease;
+    z-index:30;
+  }
+  [data-theme="dark"] .scroll-top-btn{color:#08131a;}
+  .scroll-top-btn.visible{
+    opacity:1;
+    visibility:visible;
+    transform:translateY(0) scale(1);
+  }
+  .scroll-top-btn:hover{
+    transform:translateY(-4px) scale(1.05);
+    box-shadow:0 12px 28px rgba(124,58,237,.45);
+  }
+  .scroll-top-btn:active{transform:translateY(-1px) scale(.96);}
+  .scroll-top-btn svg{width:20px;height:20px;}
+
+  /* ============================================================
+     RESPONSIVE — keypad/feature phones, mobile, tablet, laptop,
+     desktop, large screens / TV
+     ============================================================ */
+
+  /* Smooth anchor scrolling that clears the sticky navbar */
+  html{scroll-padding-top:84px;}
+
+  /* ---------- Large screens / TV (≥1440px) ---------- */
+  @media (min-width:1440px){
+    main{max-width:960px;}
+    .footer-inner{max-width:960px;}
+    body{font-size:18px;}
+    .brand-name{font-size:1.25rem;}
+    .timer-display{font-size:3.6rem;}
+    .summary-card .num{font-size:2.2rem;}
+    .q-label{font-size:1rem;}
+    .about-me h3{font-size:1.4rem;}
+    .about-me p{font-size:.96rem;}
+  }
+
+  /* ---------- Desktop / large laptop (1200–1439px) ---------- */
+  @media (min-width:1200px) and (max-width:1439px){
+    main{max-width:820px;}
+    .footer-inner{max-width:820px;}
+    .timer-display{font-size:3.3rem;}
+  }
+
+  /* ---------- Tablet landscape / small laptop (768–1023px) ---------- */
+  @media (max-width:1023px){
+    main{max-width:100%;padding:22px 24px 44px;}
+    .footer-inner{max-width:100%;padding:26px 24px 30px;}
+  }
+
+  /* ---------- Tablet portrait (601–900px) ---------- */
+  @media (max-width:900px){
+    main{padding:20px 18px 40px;}
+    .footer-inner{padding:24px 18px 28px;}
+    .timer-panel{padding:16px 16px 18px;}
+    .score-card{padding:16px 18px;}
+  }
+
+  /* ---------- Mobile (≤600px) ---------- */
+  @media (max-width:600px){
+    .navbar{padding:12px 14px;gap:8px;}
+    .brand-name{font-size:.98rem;}
+    .nav-links{gap:6px;}
+    .nav-link{padding:6px 12px;font-size:.76rem;}
+    .nav-link-full::after{top:-7px;right:-5px;font-size:.54rem;}
+    .theme-toggle{padding:6px 10px;font-size:.74rem;}
+
+    .timer-display{font-size:2.3rem;}
+    .duration-row{flex-direction:column;align-items:stretch;gap:8px;}
+    .duration-select{width:100%;}
+    .timer-btn.infinite{width:100%;}
+    .timer-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .timer-btn{min-width:0;width:100%;padding:11px 10px;}
+    .timer-top{flex-direction:column;align-items:flex-start;gap:8px;}
+    .full-test-badge{font-size:.64rem;}
+
+    .summary{gap:6px;}
+    .summary-card{padding:11px 4px;}
+    .summary-card .num{font-size:1.45rem;}
+    .summary-card .lbl{font-size:.62rem;}
+
+    .score-card{flex-direction:column;align-items:flex-start;gap:10px;}
+    .score-value{font-size:1.9rem;}
+
+    .col-head{grid-template-columns:48px 1fr 58px 58px;padding:10px 12px;font-size:.7rem;}
+    .q-row{grid-template-columns:48px 1fr 58px 58px;padding:9px 12px;}
+    .q-num{width:29px;height:29px;font-size:.7rem;}
+    .q-label{font-size:.85rem;}
+    input[type="checkbox"]{width:21px;height:21px;}
+
+    .footer-bottom{flex-direction:column;align-items:flex-start;gap:14px;}
+    .social-links{width:100%;justify-content:flex-start;}
+    .about-me h3{font-size:1.08rem;}
+    .about-me p{font-size:.84rem;}
+
+    .scroll-top-btn{width:42px;height:42px;right:14px;bottom:16px;}
+  }
+
+  /* ---------- Small mobile (≤420px) ---------- */
+  @media (max-width:420px){
+    .timer-btn{min-width:0;padding:10px 8px;font-size:.8rem;}
+    .score-card{flex-direction:column;align-items:flex-start;}
+  }
+
+  /* ---------- Ultra-small / keypad-style phones (≤340px) ---------- */
+  @media (max-width:340px){
+    .navbar{padding:10px 10px;}
+    .brand-mark{padding:0 10px;font-size:.72rem;height:30px;}
+    .brand-name{display:none;}
+    .nav-link{padding:5px 9px;font-size:.68rem;}
+    .theme-toggle span:not(.icon){display:none;}
+    .theme-toggle{padding:6px 8px;}
+
+    main{padding:16px 10px 32px;}
+    .intro p{font-size:.82rem;}
+    .timer-panel{padding:14px 12px 16px;}
+    .timer-display{font-size:1.9rem;margin:2px 0 10px;}
+    .duration-select{font-size:.8rem;padding:8px 30px 8px 12px;}
+    .timer-btn{font-size:.74rem;padding:9px 6px;}
+
+    .summary{gap:5px;}
+    .summary-card{padding:9px 2px;border-radius:11px;}
+    .summary-card .num{font-size:1.15rem;}
+    .summary-card .lbl{font-size:.56rem;}
+
+    .col-head{grid-template-columns:36px 1fr 48px 48px;padding:8px 8px;font-size:.62rem;}
+    .q-row{grid-template-columns:36px 1fr 48px 48px;padding:8px 8px;}
+    .q-num{width:24px;height:24px;font-size:.6rem;border-radius:7px;}
+    .q-label{font-size:.78rem;}
+    input[type="checkbox"]{width:19px;height:19px;border-radius:6px;}
+
+    .footer-inner{padding:20px 12px 22px;}
+    .about-me h3{font-size:1rem;}
+    .about-me p{font-size:.8rem;}
+    .social-icon{width:33px;height:33px;}
+    footer .quote{font-size:.74rem;}
+  }
+
+  /* ============================================================
+     PRACTICE MODE — dropdown + Upload Answer Key (isolated feature)
+     ============================================================ */
+
+  .mode-dropdown{position:relative;}
+  .mode-dropdown-btn{
+    display:flex;align-items:center;gap:6px;
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--muted);
+    padding:7px 15px;
+    border-radius:20px;
+    font-size:.82rem;
+    font-weight:700;
+    font-family:'Manrope',sans-serif;
+    cursor:pointer;
+    transition:background .18s, color .18s, border-color .18s, box-shadow .18s, transform .15s;
+  }
+  .mode-dropdown-btn:hover{color:var(--ink);border-color:var(--accent);transform:translateY(-1px);}
+  .mode-dropdown-btn .chev{font-size:.65rem;transition:transform .2s ease;}
+  .mode-dropdown.open .mode-dropdown-btn{
+    background:linear-gradient(120deg,var(--accent),var(--accent-2));
+    color:#f4fbfa;border-color:var(--accent);
+    box-shadow:0 4px 14px var(--accent-soft);
+  }
+  [data-theme="dark"] .mode-dropdown.open .mode-dropdown-btn{color:#08131a;}
+  .mode-dropdown.open .chev{transform:rotate(180deg);}
+  .mode-menu{
+    position:absolute;
+    top:calc(100% + 8px);
+    right:0;
+    min-width:206px;
+    background:var(--glass-strong);
+    border:1px solid var(--glass-border);
+    border-radius:14px;
+    box-shadow:var(--shadow);
+    backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+    padding:6px;
+    display:none;
+    flex-direction:column;
+    gap:2px;
+    z-index:25;
+  }
+  .mode-dropdown.open .mode-menu{display:flex;}
+  .mode-menu-item{
+    display:flex;align-items:center;gap:8px;
+    background:transparent;
+    border:none;
+    color:var(--ink);
+    text-align:left;
+    padding:10px 12px;
+    border-radius:9px;
+    font-size:.84rem;
+    font-weight:700;
+    font-family:'Manrope',sans-serif;
+    cursor:pointer;
+    transition:background .15s;
+  }
+  .mode-menu-item:hover{background:var(--accent-soft);}
+  .mode-menu-item.active{background:var(--accent-soft);color:var(--accent);}
+  .mode-menu-item .dot{width:7px;height:7px;border-radius:50%;background:var(--line);flex-shrink:0;}
+  .mode-menu-item.active .dot{background:var(--accent);}
+
+  #uploadKeyMode{display:none;}
+
+  .ak-paper-panel{
+    border-radius:16px;
+    padding:20px;
+    margin-bottom:20px;
+    box-shadow:var(--shadow);
+  }
+  .ak-paper-panel h2{
+    margin:0 0 6px;
+    font-family:'Fraunces',serif;
+    font-size:1.15rem;
+    font-weight:600;
+  }
+  .ak-paper-panel > p{margin:0 0 16px;color:var(--muted);font-size:.86rem;}
+  .ak-paper-row{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:10px;
+  }
+  .ak-paper-btn{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:5px;
+    background:var(--glass-strong);
+    border:1.5px solid var(--line);
+    color:var(--ink);
+    padding:14px 10px;
+    border-radius:12px;
+    font-size:.88rem;
+    font-weight:800;
+    font-family:'Manrope',sans-serif;
+    cursor:pointer;
+    transition:border-color .15s, background .15s, transform .12s, color .15s, box-shadow .15s;
+  }
+  .ak-paper-btn:hover{transform:translateY(-2px);border-color:var(--accent);}
+  .ak-paper-btn span{
+    font-size:.7rem;
+    font-weight:700;
+    color:var(--muted);
+    letter-spacing:.2px;
+  }
+  .ak-paper-btn.active{
+    background:linear-gradient(120deg,var(--accent),var(--accent-2));
+    border-color:var(--accent);
+    color:#f4fbfa;
+    box-shadow:0 4px 14px var(--accent-soft);
+  }
+  [data-theme="dark"] .ak-paper-btn.active{color:#08131a;}
+  .ak-paper-btn.active span{color:inherit;opacity:.85;}
+  .ak-paper-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  .ak-paper-note{
+    margin-top:12px;
+    font-size:.78rem;
+    font-weight:700;
+    color:var(--accent);
+  }
+
+  .ak-timer-panel{margin-bottom:20px;}
+
+  @media (max-width:600px){
+    .ak-paper-row{grid-template-columns:1fr;}
+  }
+
+  .ak-upload-panel{
+    border-radius:16px;
+    padding:20px;
+    margin-bottom:20px;
+    box-shadow:var(--shadow);
+  }
+  .ak-upload-panel h2{
+    margin:0 0 6px;
+    font-family:'Fraunces',serif;
+    font-size:1.15rem;
+    font-weight:600;
+  }
+  .ak-upload-panel > p{margin:0 0 16px;color:var(--muted);font-size:.86rem;}
+  .ak-file-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+  .ak-file-label{
+    flex:1 1 200px;
+    display:flex;align-items:center;gap:10px;
+    background:var(--glass-strong);
+    border:1.5px dashed var(--line);
+    border-radius:12px;
+    padding:12px 14px;
+    cursor:pointer;
+    font-size:.84rem;
+    font-weight:700;
+    color:var(--muted);
+    transition:border-color .15s, color .15s;
+    min-height:44px;
+  }
+  .ak-file-label:hover{border-color:var(--accent);color:var(--ink);}
+  .ak-file-label.has-file{border-style:solid;border-color:var(--accent);color:var(--ink);}
+  .ak-file-label input{display:none;}
+  .ak-process-btn{
+    background:var(--accent);
+    border:1px solid var(--accent);
+    color:#f4fbfa;
+    padding:12px 22px;
+    border-radius:12px;
+    font-size:.85rem;
+    font-weight:800;
+    font-family:'Manrope',sans-serif;
+    cursor:pointer;
+    transition:transform .12s, opacity .15s;
+    white-space:nowrap;
+  }
+  [data-theme="dark"] .ak-process-btn{color:#08131a;}
+  .ak-process-btn:hover:not(:disabled){transform:translateY(-2px);}
+  .ak-process-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+
+  .ak-status{
+    display:flex;align-items:center;gap:10px;
+    font-size:.83rem;font-weight:700;color:var(--muted);
+    padding:10px 14px;
+    border-radius:10px;
+    background:var(--glass);
+    border:1px solid var(--line);
+    margin-bottom:6px;
+  }
+  .ak-status .spin{
+    width:15px;height:15px;border-radius:50%;
+    border:2.5px solid var(--accent-soft);
+    border-top-color:var(--accent);
+    animation:akspin .7s linear infinite;
+    flex-shrink:0;
+    display:none;
+  }
+  .ak-status.busy .spin{display:inline-block;}
+  .ak-status.ok{color:var(--right);border-color:var(--right);background:var(--right-bg);}
+  .ak-status.err{color:var(--wrong);border-color:var(--wrong);background:var(--wrong-bg);}
+  @keyframes akspin{to{transform:rotate(360deg);}}
+  .ak-progress-wrap{
+    height:6px;width:100%;border-radius:99px;
+    background:var(--line);overflow:hidden;margin-top:10px;display:none;
+  }
+  .ak-progress-wrap.show{display:block;}
+  .ak-progress-bar{
+    height:100%;width:0%;
+    background:linear-gradient(90deg,var(--accent),var(--gold));
+    border-radius:99px;transition:width .25s ease;
+  }
+
+  .ak-sheet{
+    border-radius:16px;
+    overflow:hidden;
+    box-shadow:var(--shadow);
+  }
+  .ak-col-head{
+    display:grid;
+    grid-template-columns:70px 1fr 168px 96px;
+    padding:13px 16px;
+    background:linear-gradient(120deg,var(--accent),var(--accent-2));
+    color:#f4fbfa;
+    font-size:.76rem;
+    font-weight:800;
+    letter-spacing:.4px;
+  }
+  [data-theme="dark"] .ak-col-head{color:#08131a;}
+  .ak-col-head span:not(:first-child){text-align:center;}
+  .ak-col-head span:nth-child(2){text-align:left;}
+
+  .ak-q-row{
+    display:grid;
+    grid-template-columns:70px 1fr 168px 96px;
+    align-items:center;
+    padding:11px 16px;
+    border-bottom:1px solid var(--line);
+    gap:8px;
+  }
+  .ak-q-row:last-child{border-bottom:none;}
+  .ak-q-row:nth-child(even){background:rgba(15,110,106,.045);}
+  .ak-q-row.ak-right{background:var(--right-bg);}
+  .ak-q-row.ak-wrong{background:var(--wrong-bg);}
+  .ak-q-num{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-width:52px;height:32px;padding:0 6px;border-radius:9px;
+    background:var(--glass);
+    border:1px solid var(--line);
+    font-size:.72rem;font-weight:800;color:var(--accent);
+    font-family:'Manrope',sans-serif;
+  }
+  .ak-q-row.ak-right .ak-q-num{border-color:var(--right);color:var(--right);}
+  .ak-q-row.ak-wrong .ak-q-num{border-color:var(--wrong);color:var(--wrong);}
+  .ak-q-label{font-size:.9rem;font-weight:700;}
+  .ak-options{
+    display:flex;align-items:center;justify-content:center;gap:6px;
+  }
+  .ak-opt{
+    -webkit-appearance:none;appearance:none;
+    width:26px;height:26px;border-radius:7px;
+    border:2px solid var(--line);
+    background:var(--glass);
+    cursor:pointer;position:relative;
+    display:inline-flex;align-items:center;justify-content:center;
+    transition:border-color .15s, background .15s, transform .1s;
+  }
+  .ak-opt:hover{transform:scale(1.08);}
+  .ak-opt::before{
+    content:attr(data-opt);
+    font-size:.68rem;font-weight:800;color:var(--muted);
+    font-family:'Manrope',sans-serif;
+  }
+  .ak-opt:checked{background:var(--accent);border-color:var(--accent);}
+  .ak-opt:checked::before{color:#f4fbfa;}
+  [data-theme="dark"] .ak-opt:checked::before{color:#08131a;}
+
+  .ak-status-cell{display:flex;justify-content:center;}
+  .ak-status-pill{
+    font-size:.68rem;font-weight:800;letter-spacing:.3px;
+    padding:5px 10px;border-radius:20px;
+    background:var(--glass);border:1px solid var(--line);color:var(--muted);
+    white-space:nowrap;
+  }
+  .ak-status-pill.pending{color:var(--muted);}
+  .ak-status-pill.correct{background:var(--right-bg);border-color:var(--right);color:var(--right);}
+  .ak-status-pill.wrong{background:var(--wrong-bg);border-color:var(--wrong);color:var(--wrong);}
+
+  .ak-empty{
+    padding:34px 20px;text-align:center;color:var(--muted);font-size:.86rem;font-weight:600;
+  }
+
+  /* Native dialog styling */
+  dialog#akErrorDialog{
+    border:none;border-radius:16px;padding:0;
+    max-width:380px;width:90vw;
+    background:var(--glass-strong);
+    box-shadow:var(--shadow);
+    color:var(--ink);
+    backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(160%);
+  }
+  dialog#akErrorDialog::backdrop{background:rgba(20,10,35,.55);backdrop-filter:blur(2px);}
+  .ak-dialog-inner{padding:22px 22px 18px;}
+  .ak-dialog-icon{font-size:1.6rem;margin-bottom:8px;}
+  .ak-dialog-inner h3{
+    margin:0 0 8px;font-family:'Fraunces',serif;font-size:1.05rem;font-weight:600;color:var(--wrong);
+  }
+  .ak-dialog-inner p{margin:0 0 18px;font-size:.86rem;color:var(--muted);line-height:1.55;}
+  .ak-dialog-inner button{
+    width:100%;
+    background:var(--accent);border:1px solid var(--accent);
+    color:#f4fbfa;padding:11px 14px;border-radius:12px;
+    font-size:.85rem;font-weight:800;font-family:'Manrope',sans-serif;
+    cursor:pointer;
+  }
+  [data-theme="dark"] .ak-dialog-inner button{color:#08131a;}
+
+  @media (max-width:600px){
+    .ak-col-head,.ak-q-row{grid-template-columns:50px 1fr 128px 74px;padding:10px 10px;}
+    .ak-opt{width:22px;height:22px;}
+    .ak-status-pill{font-size:.6rem;padding:4px 7px;}
+    .ak-q-label{font-size:.82rem;}
+  }
+  @media (max-width:420px){
+    .ak-col-head,.ak-q-row{grid-template-columns:44px 1fr 116px 0px;}
+    .ak-col-head span:nth-child(4){display:none;}
+    .ak-status-cell{position:relative;}
+  }
+</style>
+</head>
+<body data-theme="light">
+
+<nav class="navbar">
+  <div class="brand">
+    <div class="brand-mark">DN</div>
+    <div class="brand-name">Deva NET Tracker</div>
+  </div>
+  <div class="nav-links">
+    <button class="nav-link active" id="paper1Btn" type="button">Paper 1</button>
+    <button class="nav-link" id="paper2Btn" type="button">Paper 2</button>
+    <button class="nav-link nav-link-full" id="fullTestBtn" type="button">Full Test</button>
+    <button class="nav-link" id="aboutBtn" type="button">About</button>
+    <div class="mode-dropdown" id="modeDropdown">
+      <button class="mode-dropdown-btn" id="modeDropdownBtn" type="button" aria-haspopup="true" aria-expanded="false">
+        Practice Mode <span class="chev">▾</span>
+      </button>
+      <div class="mode-menu" id="modeMenu" role="menu">
+        <button class="mode-menu-item active" id="modeWithoutKeyItem" type="button" role="menuitem">
+          <span class="dot"></span> Without Answer Key
+        </button>
+        <button class="mode-menu-item" id="modeUploadKeyItem" type="button" role="menuitem">
+          <span class="dot"></span> Upload Answer Key
+        </button>
+      </div>
+    </div>
+  </div>
+  <button class="theme-toggle" id="themeToggle" type="button">
+    <span class="icon" id="themeIcon">🌙</span>
+    <span id="themeLabel">Dark</span>
+  </button>
+</nav>
+
+<main>
+  <div id="withoutKeyMode">
+  <div class="intro">
+    <p>Pick a timer duration and press Start — marking unlocks the moment the timer begins.</p>
+  </div>
+
+  <div class="timer-panel glass">
+    <div class="timer-top">
+      <span class="timer-status" id="timerStatus">Choose a duration, then press Start</span>
+      <span class="full-test-badge" id="fullTestBadge">PAPER 1 TEST · 50Q · 1 Hr</span>
+    </div>
+    <div class="timer-display" id="timerDisplay">60:00</div>
+    <div class="timer-progress"><div class="timer-progress-bar" id="timerProgressBar"></div></div>
+
+    <div class="duration-row">
+      <label class="duration-label" for="durationSelect">Duration</label>
+      <select class="duration-select" id="durationSelect">
+        <option value="5">5 Min</option>
+        <option value="10">10 Min</option>
+        <option value="15">15 Min</option>
+        <option value="20">20 Min</option>
+        <option value="25">25 Min</option>
+        <option value="30">30 Min</option>
+        <option value="35">35 Min</option>
+        <option value="40">40 Min</option>
+        <option value="45">45 Min</option>
+        <option value="50">50 Min</option>
+        <option value="55">55 Min</option>
+        <option value="60" selected>60 Min</option>
+        <option value="75">75 Min</option>
+        <option value="85">85 Min</option>
+        <option value="95">95 Min</option>
+        <option value="120">120 Min</option>
+        <option value="180" id="option180">180 Min (3 Hrs)</option>
+      </select>
+      <button class="timer-btn infinite" id="infiniteBtn" type="button">∞ Infinite</button>
+    </div>
+
+    <div class="timer-controls">
+      <button class="timer-btn start" id="startBtn" type="button">Start</button>
+      <button class="timer-btn pause" id="pauseBtn" type="button" disabled>Pause</button>
+      <button class="timer-btn end" id="endBtn" type="button" disabled>End</button>
+   <button id="resetBtn" class="timer-btn end" type="button">Reset all</button>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="summary-card right">
+      <span class="num" id="rightCount">0</span>
+      <span class="lbl">CORRECT</span>
+    </div>
+    <div class="summary-card wrong">
+      <span class="num" id="wrongCount">0</span>
+      <span class="lbl">WRONG</span>
+    </div>
+    <div class="summary-card pending">
+      <span class="num" id="pendingCount">50</span>
+      <span class="lbl">UNATTEMPTED</span>
+    </div>
+  </div>
+
+  <div class="score-card glass">
+    <div class="score-info">
+      <span class="score-title">Score card</span>
+      <span class="score-sub" id="scoreSub">2 marks per question · Paper 1</span>
+    </div>
+    <div class="score-value"><span id="scoreValue">0</span><small> / <span id="scoreTotal">100</span></small></div>
+  </div>
+
+  <div class="sheet glass">
+    <div class="col-head">
+      <span>No.</span>
+      <span>Question</span>
+      <span>Correct</span>
+      <span>Wrong</span>
+    </div>
+    <div class="sheet-body" id="sheetBody">
+      <div id="qlist"></div>
+      <div class="lock-overlay" id="lockOverlay">
+        <div class="lock-badge">🔒</div>
+        <div class="lock-text" id="lockText">Choose a duration and press Start to unlock marking</div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <!-- /#withoutKeyMode -->
+
+  <div id="uploadKeyMode">
+    <div class="ak-paper-panel glass" id="akPaperPanel">
+      <h2>1. Select Paper</h2>
+      <p>Choose a paper first — this fixes the question limit and exam duration for this session.</p>
+      <div class="ak-paper-row">
+        <button class="ak-paper-btn" id="akPaper1Btn" type="button" data-paper="1">Paper 1<span>50Q · 60 Min</span></button>
+        <button class="ak-paper-btn" id="akPaper2Btn" type="button" data-paper="2">Paper 2<span>100Q · 120 Min</span></button>
+        <button class="ak-paper-btn" id="akPaperFullBtn" type="button" data-paper="3">Full Test<span>150Q · 180 Min</span></button>
+      </div>
+      <div class="ak-paper-note" id="akPaperNote" style="display:none;"></div>
+    </div>
+
+    <div class="ak-upload-panel glass" id="akUploadPanel" style="display:none;">
+      <h2>2. Upload Answer Key</h2>
+      <p>Upload a scanned/OCR-readable answer-key PDF. Questions are auto-validated against the detected Question ID → Correct Option mapping.</p>
+      <div class="ak-file-row">
+        <label class="ak-file-label" id="akFileLabel" for="akFileInput">
+          <span id="akFileLabelText">📄 Choose answer-key PDF…</span>
+          <input type="file" id="akFileInput" accept="application/pdf,.pdf">
+        </label>
+        <button class="ak-process-btn" id="akProcessBtn" type="button">Process Answer Key</button>
+      </div>
+      <div class="ak-status" id="akStatus"><span class="spin"></span><span id="akStatusText">No answer key uploaded yet.</span></div>
+      <div class="ak-progress-wrap" id="akProgressWrap"><div class="ak-progress-bar" id="akProgressBar"></div></div>
+    </div>
+
+    <div class="ak-upload-panel glass" id="akConfigPanel" style="display:none;">
+      <h2>3. Configure &amp; Start</h2>
+      <div class="ak-status ok" id="akConfigConfirm" style="margin-bottom:16px;">
+        <span>✓</span><span>Answer Key Processed Successfully ✓</span>
+      </div>
+      <div class="duration-row" style="justify-content:flex-start;">
+        <label class="duration-label" for="akConfigDurationSelect">Duration</label>
+        <select class="duration-select" id="akConfigDurationSelect">
+          <option value="15">15 minutes</option>
+          <option value="30">30 minutes</option>
+          <option value="45">45 minutes</option>
+          <option value="60" selected>60 minutes</option>
+          <option value="75">1 hrs 15 minutes</option>
+          <option value="85">1 hrs 25 minutes</option>
+          <option value="90">1 hrs 30 minutes</option>
+        </select>
+        <button class="timer-btn infinite" id="akConfigInfiniteBtn" type="button">∞ Infinite</button>
+      </div>
+      <button class="timer-btn start" id="akConfigStartBtn" type="button" style="width:100%;margin-top:14px;">Start Examination</button>
+    </div>
+
+    <div class="timer-panel ak-timer-panel glass" id="akTimerPanel" style="display:none;">
+      <div class="timer-top">
+        <span class="timer-status" id="akTimerStatus">Waiting for answer key…</span>
+        <span class="full-test-badge" id="akFullTestBadge">PAPER 1 TEST · 50Q · 1 Hr</span>
+      </div>
+      <div class="timer-display" id="akTimerDisplay">60:00</div>
+      <div class="timer-progress"><div class="timer-progress-bar" id="akTimerProgressBar"></div></div>
+      <div class="timer-controls">
+        <button class="timer-btn pause" id="akPauseBtn" type="button" disabled>Pause</button>
+        <button class="timer-btn end" id="akEndBtn" type="button" disabled>End</button>
+        <button class="timer-btn end" id="akResetBtn" type="button">Reset all</button>
+      </div>
+    </div>
+
+    <div class="summary" id="akSummary" style="display:none;">
+      <div class="summary-card right">
+        <span class="num" id="akRightCount">0</span>
+        <span class="lbl">CORRECT</span>
+      </div>
+      <div class="summary-card wrong">
+        <span class="num" id="akWrongCount">0</span>
+        <span class="lbl">WRONG</span>
+      </div>
+      <div class="summary-card pending">
+        <span class="num" id="akPendingCount">0</span>
+        <span class="lbl">UNATTEMPTED</span>
+      </div>
+    </div>
+
+    <div class="score-card glass" id="akScoreCard" style="display:none;">
+      <div class="score-info">
+        <span class="score-title">Score card</span>
+        <span class="score-sub" id="akScoreSub">2 marks per question · Answer-key mode</span>
+      </div>
+      <div class="score-value"><span id="akScoreValue">0</span><small> / <span id="akScoreTotal">0</span></small></div>
+    </div>
+
+    <div class="ak-sheet glass" id="akSheetWrap" style="display:none;">
+      <div class="ak-col-head">
+        <span>ID</span>
+        <span>Question</span>
+        <span>Options</span>
+        <span>Status</span>
+      </div>
+      <div class="sheet-body" id="akSheetBody">
+        <div id="akQlist"></div>
+        <div class="lock-overlay" id="akLockOverlay">
+          <div class="lock-badge">🔒</div>
+          <div class="lock-text" id="akLockText">Select a paper and process the answer key to unlock marking</div>
+        </div>
+      </div>
+    </div>
+    <div class="ak-sheet glass" id="akEmptyWrap">
+      <div class="ak-empty">Select a paper, then upload and process an answer-key PDF to begin this practice session.</div>
+    </div>
+  </div>
+  <!-- /#uploadKeyMode -->
+
+  <dialog id="akErrorDialog">
+    <div class="ak-dialog-inner">
+      <div class="ak-dialog-icon">⚠️</div>
+      <h3 id="akDialogTitle">Upload error</h3>
+      <p id="akDialogMsg">Something went wrong.</p>
+      <button id="akDialogCloseBtn" type="button">Close</button>
+    </div>
+  </dialog>
+
+  <footer class="site-footer" id="aboutSection">
+    <div class="footer-inner">
+      <div class="about-me">
+        <h3>Hi, I'm Deva 👋</h3>
+        <p>I'm a <strong>MERN Stack Developer</strong> and <strong>M.Sc. Computer Science graduate from Loyola College, Chennai, 2026</strong>. I specialize in building modern, responsive, and scalable web applications using <strong>MongoDB, Express.js, React.js, and Node.js</strong>.</p>
+        <p>I'm passionate about software development, problem-solving, and creating impactful digital experiences. I'm always eager to learn new technologies and turn ideas into practical, user-friendly applications.</p>
+      </div>
+      <div class="footer-bottom">
+        <p class="quote">Track your score. Track your growth. Rise to JRF.</p>
+        <div class="social-links">
+          <a class="social-icon" href="https://wa.me/918610297625" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.074-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347z"/>
+              <path d="M12.004 2c-5.514 0-9.988 4.474-9.988 9.988 0 1.762.462 3.483 1.34 5.003L2 22l5.144-1.34a9.96 9.96 0 0 0 4.86 1.24h.004c5.514 0 9.988-4.474 9.988-9.988C21.996 6.474 17.522 2 12.004 2zm0 18.176h-.003a8.15 8.15 0 0 1-4.156-1.138l-.298-.177-3.056.797.816-2.98-.194-.306a8.15 8.15 0 0 1-1.253-4.384c0-4.508 3.668-8.176 8.148-8.176 2.176 0 4.221.848 5.759 2.387a8.09 8.09 0 0 1 2.385 5.763c0 4.508-3.667 8.214-8.148 8.214z"/>
+            </svg>
+          </a>
+          <a class="social-icon" href="https://www.instagram.com/deva__0701" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 1.17.054 1.805.249 2.227.415.56.217.96.477 1.38.896.42.42.68.82.896 1.38.166.422.361 1.057.415 2.227.058 1.266.07 1.646.07 4.85s-.012 3.584-.07 4.85c-.054 1.17-.249 1.805-.415 2.227a3.7 3.7 0 0 1-.896 1.38c-.42.42-.82.68-1.38.896-.422.166-1.057.361-2.227.415-1.265.058-1.645.07-4.85.07s-3.585-.012-4.85-.07c-1.17-.054-1.805-.249-2.227-.415a3.7 3.7 0 0 1-1.38-.896 3.7 3.7 0 0 1-.896-1.38c-.166-.422-.361-1.057-.415-2.227-.058-1.266-.07-1.646-.07-4.85s.012-3.584.07-4.85c.054-1.17.249-1.805.415-2.227.217-.56.477-.96.896-1.38.42-.42.82-.68 1.38-.896.422-.166 1.057-.361 2.227-.415 1.265-.058 1.645-.07 4.85-.07zM12 0C8.741 0 8.332.014 7.052.072 5.775.131 4.905.333 4.14.63a5.9 5.9 0 0 0-2.126 1.384A5.9 5.9 0 0 0 .63 4.14C.333 4.905.131 5.775.072 7.052.014 8.332 0 8.741 0 12s.014 3.668.072 4.948c.059 1.277.261 2.147.558 2.912a5.9 5.9 0 0 0 1.384 2.126 5.9 5.9 0 0 0 2.126 1.384c.765.297 1.635.499 2.912.558C8.332 23.986 8.741 24 12 24s3.668-.014 4.948-.072c1.277-.059 2.147-.261 2.912-.558a5.9 5.9 0 0 0 2.126-1.384 5.9 5.9 0 0 0 1.384-2.126c.297-.765.499-1.635.558-2.912.058-1.28.072-1.689.072-4.948s-.014-3.668-.072-4.948c-.059-1.277-.261-2.147-.558-2.912a5.9 5.9 0 0 0-1.384-2.126A5.9 5.9 0 0 0 19.86.63c-.765-.297-1.635-.499-2.912-.558C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
+            </svg>
+          </a>
+          <a class="social-icon" href="https://www.facebook.com/share/1D5MJLpVVr/" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+              <path d="M22 12.06C22 6.505 17.523 2 12 2S2 6.505 2 12.06c0 5.02 3.657 9.184 8.438 9.94v-7.03H7.898v-2.91h2.54V9.845c0-2.522 1.492-3.915 3.777-3.915 1.094 0 2.238.196 2.238.196v2.475h-1.26c-1.243 0-1.63.775-1.63 1.57v1.888h2.773l-.443 2.91h-2.33V22c4.78-.756 8.437-4.92 8.437-9.94z"/>
+            </svg>
+          </a>
+          <a class="social-icon" href="https://github.com/deva-p-stack" target="_blank" rel="noopener noreferrer" aria-label="GitHub profile">
+            <svg viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true">
+              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+              0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
+              -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
+              .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15
+              -.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0
+              1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82
+              1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01
+              1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+</main>
+
+<button class="scroll-top-btn" id="scrollTopBtn" type="button" aria-label="Scroll to top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 19V5"/>
+    <path d="M5 12l7-7 7 7"/>
+  </svg>
+</button>
+
+<script>
+(function(){
+  /* ---------------- Question sheet ---------------- */
+  const MARKS_PER_Q = 2;
+  let TOTAL = 50;
+  let currentPaper = 1;
+  const qlist = document.getElementById('qlist');
+  const rightCountEl = document.getElementById('rightCount');
+  const wrongCountEl = document.getElementById('wrongCount');
+  const pendingCountEl = document.getElementById('pendingCount');
+  const paper1Btn = document.getElementById('paper1Btn');
+  const paper2Btn = document.getElementById('paper2Btn');
+  const lockOverlay = document.getElementById('lockOverlay');
+  const lockText = document.getElementById('lockText');
+  const scoreValueEl = document.getElementById('scoreValue');
+  const scoreTotalEl = document.getElementById('scoreTotal');
+  const scoreSubEl = document.getElementById('scoreSub');
+
+  function buildQuestions(total){
+    qlist.innerHTML = '';
+    for (let i = 1; i <= total; i++) {
+      const row = document.createElement('div');
+      row.className = 'q-row';
+      row.dataset.q = i;
+      row.innerHTML =
+        '<div class="q-num">Q' + i + '</div>' +
+        '<div class="q-label">Question ' + i + '</div>' +
+        '<div class="chk-cell"><input type="checkbox" class="right-box" data-role="right" data-q="' + i + '" disabled></div>' +
+        '<div class="chk-cell"><input type="checkbox" class="wrong-box" data-role="wrong" data-q="' + i + '" disabled></div>';
+      qlist.appendChild(row);
+    }
+  }
+
+  function updateSummary(){
+    const rightChecked = qlist.querySelectorAll('input[data-role="right"]:checked').length;
+    const wrongChecked = qlist.querySelectorAll('input[data-role="wrong"]:checked').length;
+    rightCountEl.textContent = rightChecked;
+    wrongCountEl.textContent = wrongChecked;
+    pendingCountEl.textContent = TOTAL - rightChecked - wrongChecked;
+
+    const totalMarks = TOTAL * MARKS_PER_Q;
+    scoreValueEl.textContent = rightChecked * MARKS_PER_Q;
+    scoreTotalEl.textContent = totalMarks;
+    const paperLabel = currentPaper === 3 ? 'Full Test' : ('Paper ' + currentPaper);
+    scoreSubEl.textContent = MARKS_PER_Q + ' marks per question · ' + paperLabel + ' · Total ' + totalMarks;
+  }
+
+  qlist.addEventListener('change', function(e){
+    const target = e.target;
+    if (target.tagName !== 'INPUT') return;
+
+    const role = target.dataset.role;
+    const row = target.closest('.q-row');
+    const rightBox = row.querySelector('input[data-role="right"]');
+    const wrongBox = row.querySelector('input[data-role="wrong"]');
+
+    if (target.checked) {
+      if (role === 'right') {
+        wrongBox.checked = false;
+        row.classList.add('marked-right');
+        row.classList.remove('marked-wrong');
+      } else {
+        rightBox.checked = false;
+        row.classList.add('marked-wrong');
+        row.classList.remove('marked-right');
+      }
+    } else {
+      row.classList.remove('marked-right', 'marked-wrong');
+    }
+
+    updateSummary();
+  });
+
+  function setLocked(locked, message){
+    lockOverlay.style.display = locked ? 'flex' : 'none';
+    if (message) lockText.textContent = message;
+    qlist.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.disabled = locked; });
+  }
+
+  /* ---------------- Timer ---------------- */
+  const durationSelect = document.getElementById('durationSelect');
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const endBtn = document.getElementById('endBtn');
+  const infiniteBtn = document.getElementById('infiniteBtn');
+  const timerDisplay = document.getElementById('timerDisplay');
+  const timerStatus = document.getElementById('timerStatus');
+  const timerProgressBar = document.getElementById('timerProgressBar');
+  const timerPanel = document.querySelector('.timer-panel');
+  const fullTestBadge = document.getElementById('fullTestBadge');
+
+  let timerState = 'idle'; // idle -> running -> paused -> ended
+  let isInfinite = false;
+  let isFullTest = false;
+  let selectedDuration = parseInt(durationSelect.value, 10) * 60;
+  let remaining = selectedDuration;
+  let intervalId = null;
+
+  const DEFAULT_DURATION = { 1: 60, 2: 120, 3: 180 };
+  const PAPER_LABEL = { 1: 'PAPER 1 TEST', 2: 'PAPER 2 TEST', 3: 'FULL TEST' };
+
+  function formatDurationLabel(minutes){
+    if (minutes % 60 === 0){
+      const hrs = minutes / 60;
+      return hrs + (hrs === 1 ? ' Hr' : ' Hrs');
+    }
+    if (minutes > 60){
+      const hrs = Math.floor(minutes / 60);
+      const rem = minutes % 60;
+      return hrs + 'h ' + rem + 'm';
+    }
+    return minutes + ' Min';
+  }
+
+  function updateTestBadge(){
+    const minutes = parseInt(durationSelect.value, 10);
+    const label = PAPER_LABEL[currentPaper] || 'TEST';
+    fullTestBadge.textContent = label + ' · ' + TOTAL + 'Q · ' + formatDurationLabel(minutes);
+    fullTestBadge.classList.remove('p2', 'full');
+    if (currentPaper === 2) fullTestBadge.classList.add('p2');
+    if (currentPaper === 3) fullTestBadge.classList.add('full');
+  }
+
+  function formatTime(sec){
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function tick(){
+    if (isInfinite){
+      remaining += 1;
+      updateTimerUI();
+      return;
+    }
+    remaining -= 1;
+    if (remaining <= 0){
+      remaining = 0;
+      updateTimerUI();
+      endTimer(true);
+      return;
+    }
+    updateTimerUI();
+  }
+
+  function updateTimerUI(){
+    timerDisplay.textContent = formatTime(remaining);
+    if (isInfinite){
+      timerProgressBar.style.width = '100%';
+      timerDisplay.classList.remove('urgent');
+      timerProgressBar.classList.remove('urgent');
+      return;
+    }
+    const pct = selectedDuration ? Math.max(0, Math.min(100, ((selectedDuration - remaining) / selectedDuration) * 100)) : 0;
+    timerProgressBar.style.width = pct + '%';
+    const urgent = remaining <= 60 && remaining > 0 && timerState === 'running';
+    timerDisplay.classList.toggle('urgent', urgent);
+    timerProgressBar.classList.toggle('urgent', urgent);
+  }
+
+  durationSelect.addEventListener('change', function(){
+    if (timerState !== 'idle') return;
+    selectedDuration = parseInt(durationSelect.value, 10) * 60;
+    remaining = selectedDuration;
+    timerDisplay.textContent = formatTime(remaining);
+    timerProgressBar.style.width = '0%';
+    updateTestBadge();
+  });
+
+  function startTimer(){
+    if (timerState !== 'idle') return;
+    isInfinite = false;
+    infiniteBtn.classList.remove('is-active');
+    selectedDuration = parseInt(durationSelect.value, 10) * 60;
+    remaining = selectedDuration;
+    timerState = 'running';
+    durationSelect.disabled = true;
+    infiniteBtn.disabled = true;
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    pauseBtn.textContent = 'Pause';
+    endBtn.disabled = false;
+    timerStatus.textContent = 'In progress';
+    timerStatus.className = 'timer-status is-running';
+    setLocked(false);
+    timerPanel.classList.add('is-live');
+    updateTimerUI();
+    intervalId = setInterval(tick, 1000);
+  }
+
+  function startInfinite(){
+    if (timerState !== 'idle') return;
+    isInfinite = true;
+    infiniteBtn.classList.add('is-active');
+    remaining = 0;
+    timerState = 'running';
+    durationSelect.disabled = true;
+    infiniteBtn.disabled = true;
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    pauseBtn.textContent = 'Pause';
+    endBtn.disabled = false;
+    timerStatus.textContent = 'In progress · Infinite';
+    timerStatus.className = 'timer-status is-running';
+    setLocked(false);
+    timerPanel.classList.add('is-live');
+    updateTimerUI();
+    intervalId = setInterval(tick, 1000);
+  }
+
+  function pauseOrResume(){
+    if (timerState === 'running'){
+      clearInterval(intervalId);
+      timerState = 'paused';
+      pauseBtn.textContent = 'Resume';
+      timerStatus.textContent = 'Paused';
+      timerStatus.className = 'timer-status is-paused';
+      setLocked(true, 'Paused — resume the timer to keep marking answers');
+      timerPanel.classList.remove('is-live');
+    } else if (timerState === 'paused'){
+      timerState = 'running';
+      pauseBtn.textContent = 'Pause';
+      timerStatus.textContent = isInfinite ? 'In progress · Infinite' : 'In progress';
+      timerStatus.className = 'timer-status is-running';
+      setLocked(false);
+      timerPanel.classList.add('is-live');
+      intervalId = setInterval(tick, 1000);
+    }
+  }
+
+  function endTimer(auto){
+    clearInterval(intervalId);
+    timerState = 'ended';
+    startBtn.disabled = true;
+    pauseBtn.disabled = true;
+    endBtn.disabled = true;
+    timerStatus.className = 'timer-status is-ended';
+    timerPanel.classList.remove('is-live');
+    if (auto){
+      timerStatus.textContent = "Time's up";
+      setLocked(true, "Time's up! Review your marked answers below.");
+    } else {
+      timerStatus.textContent = 'Session ended';
+      setLocked(true, 'Session ended. Press Reset all to start a new attempt.');
+    }
+  }
+
+  function resetTimer(){
+    clearInterval(intervalId);
+    timerState = 'idle';
+    isInfinite = false;
+    infiniteBtn.classList.remove('is-active');
+    timerPanel.classList.remove('is-live');
+    durationSelect.value = String(DEFAULT_DURATION[currentPaper] || 60);
+    updateTestBadge();
+    selectedDuration = parseInt(durationSelect.value, 10) * 60;
+    remaining = selectedDuration;
+    timerDisplay.textContent = formatTime(remaining);
+    timerDisplay.classList.remove('urgent');
+    timerProgressBar.style.width = '0%';
+    timerProgressBar.classList.remove('urgent');
+    timerStatus.textContent = isFullTest ? 'Full Test · Fixed 3 hr duration — press Start' : 'Choose a duration, then press Start';
+    timerStatus.className = 'timer-status';
+    durationSelect.disabled = isFullTest ? true : false;
+    infiniteBtn.disabled = isFullTest ? true : false;
+    infiniteBtn.style.display = isFullTest ? 'none' : '';
+    startBtn.disabled = false;
+    pauseBtn.disabled = true;
+    pauseBtn.textContent = 'Pause';
+    endBtn.disabled = true;
+    setLocked(true, 'Choose a duration and press Start to unlock marking');
+  }
+
+  startBtn.addEventListener('click', startTimer);
+  infiniteBtn.addEventListener('click', startInfinite);
+  pauseBtn.addEventListener('click', pauseOrResume);
+  endBtn.addEventListener('click', function(){ endTimer(false); });
+
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    qlist.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    qlist.querySelectorAll('.q-row').forEach(r => r.classList.remove('marked-right','marked-wrong'));
+    updateSummary();
+    resetTimer();
+  });
+
+  function switchPaper(total, paperNum, fullTest, activeBtn, allBtns){
+    TOTAL = total;
+    currentPaper = paperNum;
+    isFullTest = fullTest;
+    buildQuestions(total);
+    updateSummary();
+    allBtns.forEach(function(btn){ btn.classList.remove('active'); });
+    activeBtn.classList.add('active');
+    resetTimer();
+  }
+
+  const fullTestBtn = document.getElementById('fullTestBtn');
+  const allPaperBtns = [paper1Btn, paper2Btn, fullTestBtn];
+
+  paper1Btn.addEventListener('click', function(){
+    switchPaper(50, 1, false, paper1Btn, allPaperBtns);
+  });
+  paper2Btn.addEventListener('click', function(){
+    switchPaper(100, 2, false, paper2Btn, allPaperBtns);
+  });
+  fullTestBtn.addEventListener('click', function(){
+    switchPaper(150, 3, true, fullTestBtn, allPaperBtns);
+  });
+
+  const aboutBtn = document.getElementById('aboutBtn');
+  const aboutSection = document.getElementById('aboutSection');
+  aboutBtn.addEventListener('click', function(){
+    aboutSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  buildQuestions(TOTAL);
+  updateSummary();
+  updateTestBadge();
+  setLocked(true, 'Choose a duration and press Start to unlock marking');
+
+  /* ---------------- 3D tilt on summary cards ---------------- */
+  document.querySelectorAll('.summary-card').forEach(function(card){
+    card.addEventListener('mousemove', function(e){
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      const rotateY = ((x - cx) / cx) * 8;
+      const rotateX = -((y - cy) / cy) * 8;
+      card.style.transform = 'translateY(-4px) rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg)';
+    });
+    card.addEventListener('mouseleave', function(){
+      card.style.transform = 'translateY(0) rotateX(0) rotateY(0)';
+    });
+  });
+
+  /* ---------------- Theme toggle ---------------- */
+  const body = document.body;
+  const themeToggle = document.getElementById('themeToggle');
+  const themeIcon = document.getElementById('themeIcon');
+  const themeLabel = document.getElementById('themeLabel');
+
+  function applyTheme(theme){
+    body.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      themeIcon.textContent = '☀️';
+      themeLabel.textContent = 'Light';
+    } else {
+      themeIcon.textContent = '🌙';
+      themeLabel.textContent = 'Dark';
+    }
+  }
+
+  themeToggle.addEventListener('click', function(){
+    const current = body.getAttribute('data-theme');
+    applyTheme(current === 'dark' ? 'light' : 'dark');
+  });
+
+  /* ---------------- Scroll to top ---------------- */
+  const scrollTopBtn = document.getElementById('scrollTopBtn');
+  window.addEventListener('scroll', function(){
+    scrollTopBtn.classList.toggle('visible', window.scrollY > 320);
+  });
+  scrollTopBtn.addEventListener('click', function(){
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  /* ---------------- Scroll-reveal for footer ---------------- */
+  const revealFooter = document.querySelector('.site-footer');
+  if ('IntersectionObserver' in window && revealFooter){
+    const footerObserver = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if (entry.isIntersecting){
+          revealFooter.classList.add('in-view');
+          footerObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+    footerObserver.observe(revealFooter);
+  } else if (revealFooter){
+    revealFooter.classList.add('in-view');
+  }
+})();
+</script>
+
+<script>
+/* ============================================================
+   PRACTICE MODE — Practice Mode dropdown + Upload Answer Key.
+   Fully isolated from the existing "Without Answer Key" system
+   above: separate DOM tree, separate state, separate listeners.
+   Nothing here touches qlist / timer / summary / score logic.
+   ============================================================ */
+(function(){
+  'use strict';
+
+  /* ---------- Practice Mode dropdown ---------- */
+  var modeDropdown = document.getElementById('modeDropdown');
+  var modeDropdownBtn = document.getElementById('modeDropdownBtn');
+  var modeWithoutKeyItem = document.getElementById('modeWithoutKeyItem');
+  var modeUploadKeyItem = document.getElementById('modeUploadKeyItem');
+  var withoutKeyMode = document.getElementById('withoutKeyMode');
+  var uploadKeyMode = document.getElementById('uploadKeyMode');
+
+  function closeMenu(){
+    modeDropdown.classList.remove('open');
+    modeDropdownBtn.setAttribute('aria-expanded', 'false');
+  }
+  function toggleMenu(){
+    var isOpen = modeDropdown.classList.toggle('open');
+    modeDropdownBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
+  modeDropdownBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    toggleMenu();
+  });
+  document.addEventListener('click', function(e){
+    if (!modeDropdown.contains(e.target)) closeMenu();
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeMenu();
+  });
+
+  function selectMode(mode){
+    if (mode === 'upload'){
+      withoutKeyMode.style.display = 'none';
+      uploadKeyMode.style.display = 'block';
+      modeUploadKeyItem.classList.add('active');
+      modeWithoutKeyItem.classList.remove('active');
+    } else {
+      uploadKeyMode.style.display = 'none';
+      withoutKeyMode.style.display = 'block';
+      modeWithoutKeyItem.classList.add('active');
+      modeUploadKeyItem.classList.remove('active');
+    }
+    closeMenu();
+  }
+  modeWithoutKeyItem.addEventListener('click', function(){ selectMode('without'); });
+  modeUploadKeyItem.addEventListener('click', function(){ selectMode('upload'); });
+
+  /* ---------- Error dialog (native <dialog>) ---------- */
+  var akErrorDialog = document.getElementById('akErrorDialog');
+  var akDialogTitle = document.getElementById('akDialogTitle');
+  var akDialogMsg = document.getElementById('akDialogMsg');
+  var akDialogCloseBtn = document.getElementById('akDialogCloseBtn');
+
+  function showAkError(title, message){
+    akDialogTitle.textContent = title;
+    akDialogMsg.textContent = message;
+    if (typeof akErrorDialog.showModal === 'function'){
+      if (!akErrorDialog.open) akErrorDialog.showModal();
+    } else {
+      // Fallback for browsers without <dialog> support
+      window.alert(title + '\n\n' + message);
+    }
+  }
+  akDialogCloseBtn.addEventListener('click', function(){ akErrorDialog.close(); });
+  akErrorDialog.addEventListener('click', function(e){
+    var rect = akErrorDialog.getBoundingClientRect();
+    var inside = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+    if (!inside) akErrorDialog.close();
+  });
+
+  /* ---------- Select Paper elements ---------- */
+  var akPaperPanel = document.getElementById('akPaperPanel');
+  var akPaper1Btn = document.getElementById('akPaper1Btn');
+  var akPaper2Btn = document.getElementById('akPaper2Btn');
+  var akPaperFullBtn = document.getElementById('akPaperFullBtn');
+  var akPaperNote = document.getElementById('akPaperNote');
+  var akAllPaperBtns = [akPaper1Btn, akPaper2Btn, akPaperFullBtn];
+
+  /* ---------- Upload Answer Key elements ---------- */
+  var akUploadPanel = document.getElementById('akUploadPanel');
+  var akFileInput = document.getElementById('akFileInput');
+  var akFileLabel = document.getElementById('akFileLabel');
+  var akFileLabelText = document.getElementById('akFileLabelText');
+  var akProcessBtn = document.getElementById('akProcessBtn');
+  var akStatus = document.getElementById('akStatus');
+  var akStatusText = document.getElementById('akStatusText');
+  var akProgressWrap = document.getElementById('akProgressWrap');
+  var akProgressBar = document.getElementById('akProgressBar');
+
+  /* ---------- Pre-exam configuration elements ---------- */
+  var akConfigPanel = document.getElementById('akConfigPanel');
+  var akConfigDurationSelect = document.getElementById('akConfigDurationSelect');
+  var akConfigInfiniteBtn = document.getElementById('akConfigInfiniteBtn');
+  var akConfigStartBtn = document.getElementById('akConfigStartBtn');
+  var akConfigIsInfinite = false;
+
+  /* ---------- AK Timer elements ---------- */
+  var akTimerPanel = document.getElementById('akTimerPanel');
+  var akTimerStatus = document.getElementById('akTimerStatus');
+  var akFullTestBadge = document.getElementById('akFullTestBadge');
+  var akTimerDisplay = document.getElementById('akTimerDisplay');
+  var akTimerProgressBar = document.getElementById('akTimerProgressBar');
+  var akPauseBtn = document.getElementById('akPauseBtn');
+  var akEndBtn = document.getElementById('akEndBtn');
+  var akResetBtn = document.getElementById('akResetBtn');
+
+  var akSummary = document.getElementById('akSummary');
+  var akScoreCard = document.getElementById('akScoreCard');
+  var akSheetWrap = document.getElementById('akSheetWrap');
+  var akEmptyWrap = document.getElementById('akEmptyWrap');
+  var akSheetBody = document.getElementById('akSheetBody');
+  var akQlist = document.getElementById('akQlist');
+  var akLockOverlay = document.getElementById('akLockOverlay');
+  var akLockText = document.getElementById('akLockText');
+
+  var akRightCountEl = document.getElementById('akRightCount');
+  var akWrongCountEl = document.getElementById('akWrongCount');
+  var akPendingCountEl = document.getElementById('akPendingCount');
+  var akScoreValueEl = document.getElementById('akScoreValue');
+  var akScoreTotalEl = document.getElementById('akScoreTotal');
+  var akScoreSubEl = document.getElementById('akScoreSub');
+
+  var AK_MARKS_PER_Q = 2;
+  var AK_PAPER_QUESTIONS = { 1: 50, 2: 100, 3: 150 };
+  var AK_PAPER_LABEL = { 1: 'PAPER 1 TEST', 2: 'PAPER 2 TEST', 3: 'FULL TEST' };
+
+  var akSelectedPaper = null; // 1, 2, or 3 — must be chosen before upload
+  var akTotal = 0;            // question limit for the selected paper
+  var akAnswerKey = {};      // { questionId(string) -> correctOption(1-4) }
+  var akQuestionIds = [];    // sorted list of question id strings (capped to akTotal)
+  var akUserAnswers = {};    // { questionId -> selectedOption }
+  var akProcessing = false;
+
+  var akTimerState = 'idle'; // idle -> running -> paused -> ended
+  var akIsInfinite = false;
+  var akUseHMS = false;       // true when the chosen duration is over 60 minutes
+  var akSelectedDuration = 0;
+  var akRemaining = 0;
+  var akIntervalId = null;
+
+  if (typeof pdfjsLib !== 'undefined'){
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    } catch (e) { /* worker setup best-effort */ }
+  }
+
+  function formatAkTime(sec){
+    if (akUseHMS){
+      var h = Math.floor(sec / 3600);
+      var hm = Math.floor((sec % 3600) / 60);
+      var hs = sec % 60;
+      return h + ':' + String(hm).padStart(2, '0') + ':' + String(hs).padStart(2, '0');
+    }
+    var m = Math.floor(sec / 60);
+    var s = sec % 60;
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function formatAkDurationLabel(minutes){
+    if (minutes % 60 === 0){
+      var hrs = minutes / 60;
+      return hrs + (hrs === 1 ? ' Hr' : ' Hrs');
+    }
+    if (minutes > 60){
+      var hh = Math.floor(minutes / 60);
+      var mm = minutes % 60;
+      return hh + 'h ' + mm + 'm';
+    }
+    return minutes + ' Min';
+  }
+
+  function updateAkBadge(){
+    var label = AK_PAPER_LABEL[akSelectedPaper] || 'TEST';
+    var qCount = akQuestionIds.length || akTotal;
+    var durLabel = akIsInfinite ? 'Infinite' : formatAkDurationLabel(Math.round(akSelectedDuration / 60));
+    akFullTestBadge.textContent = label + ' · ' + qCount + 'Q · ' + durLabel;
+    akFullTestBadge.classList.remove('p2', 'full');
+    if (akSelectedPaper === 2) akFullTestBadge.classList.add('p2');
+    if (akSelectedPaper === 3) akFullTestBadge.classList.add('full');
+  }
+
+  function setAkLocked(locked, message){
+    akLockOverlay.style.display = locked ? 'flex' : 'none';
+    if (message) akLockText.textContent = message;
+    akQlist.querySelectorAll('input[type="checkbox"]').forEach(function(cb){ cb.disabled = locked; });
+  }
+
+  function resetAkConfigControls(){
+    akConfigIsInfinite = false;
+    akConfigInfiniteBtn.classList.remove('is-active');
+    akConfigDurationSelect.disabled = false;
+    akConfigDurationSelect.value = '60';
+  }
+
+  function selectAkPaper(paperNum, btn){
+    // Changing paper before an exam is in progress fully resets any
+    // in-progress upload/processing for the previous selection.
+    if (akTimerState === 'running' || akTimerState === 'paused') return;
+
+    akSelectedPaper = paperNum;
+    akTotal = AK_PAPER_QUESTIONS[paperNum];
+
+    akAllPaperBtns.forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+
+    akPaperNote.style.display = 'block';
+    akPaperNote.textContent = 'Selected: ' + AK_PAPER_LABEL[paperNum] + ' · ' + akTotal + ' questions. Choose your exam duration after the answer key is processed.';
+
+    // Reset any previously uploaded/processed key when paper changes.
+    akAnswerKey = {};
+    akQuestionIds = [];
+    akUserAnswers = {};
+    akFileInput.value = '';
+    akFileLabel.classList.remove('has-file');
+    akFileLabelText.textContent = '📄 Choose answer-key PDF…';
+    setAkProgress(null);
+    setAkStatus('No answer key uploaded yet.', '');
+
+    akUploadPanel.style.display = 'block';
+    akConfigPanel.style.display = 'none';
+    resetAkConfigControls();
+    akTimerPanel.style.display = 'none';
+    akSummary.style.display = 'none';
+    akScoreCard.style.display = 'none';
+    akSheetWrap.style.display = 'none';
+    akEmptyWrap.style.display = 'block';
+    resetAkTimerState();
+  }
+
+  akPaper1Btn.addEventListener('click', function(){ selectAkPaper(1, akPaper1Btn); });
+  akPaper2Btn.addEventListener('click', function(){ selectAkPaper(2, akPaper2Btn); });
+  akPaperFullBtn.addEventListener('click', function(){ selectAkPaper(3, akPaperFullBtn); });
+
+  akFileInput.addEventListener('change', function(){
+    var f = akFileInput.files && akFileInput.files[0];
+    if (f){
+      akFileLabel.classList.add('has-file');
+      akFileLabelText.textContent = '📄 ' + f.name;
+    } else {
+      akFileLabel.classList.remove('has-file');
+      akFileLabelText.textContent = '📄 Choose answer-key PDF…';
+    }
+  });
+
+  function setAkStatus(text, mode){
+    akStatusText.textContent = text;
+    akStatus.className = 'ak-status' + (mode ? ' ' + mode : '');
+  }
+  function setAkProgress(pct){
+    if (pct === null){
+      akProgressWrap.classList.remove('show');
+      akProgressBar.style.width = '0%';
+      return;
+    }
+    akProgressWrap.classList.add('show');
+    akProgressBar.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  }
+
+  /* ---- Step 1: file presence + type validation ---- */
+  function readFileHeader(file){
+    return file.slice(0, 5).arrayBuffer().then(function(buf){
+      var bytes = new Uint8Array(buf);
+      var str = '';
+      for (var i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+      return str;
+    });
+  }
+
+  function validateFile(file){
+    if (!file){
+      return Promise.reject({ title: 'No PDF uploaded', message: 'Please choose an answer-key PDF file before processing.' });
+    }
+    var nameLooksLikePdf = /\.pdf$/i.test(file.name || '');
+    var typeLooksLikePdf = file.type === 'application/pdf';
+    if (!nameLooksLikePdf && !typeLooksLikePdf){
+      return Promise.reject({ title: 'Invalid file type', message: 'The selected file does not appear to be a PDF. Please upload a .pdf answer key.' });
+    }
+    return readFileHeader(file).then(function(header){
+      if (header.indexOf('%PDF') !== 0){
+        return Promise.reject({ title: 'Invalid file type', message: 'This file is not a valid PDF (missing PDF header). Please upload a genuine PDF answer key.' });
+      }
+      return file;
+    }).catch(function(err){
+      if (err && err.title) return Promise.reject(err);
+      return Promise.reject({ title: 'PDF cannot be read', message: 'The uploaded file could not be read. It may be corrupted — please try another PDF.' });
+    });
+  }
+
+  /* ---- Step 2: render each PDF page to a canvas image ---- */
+  function renderPdfToImages(file){
+    return file.arrayBuffer().then(function(buf){
+      if (typeof pdfjsLib === 'undefined'){
+        return Promise.reject({ title: 'PDF cannot be read', message: 'The PDF engine failed to load. Check your connection and try again.' });
+      }
+      return pdfjsLib.getDocument({ data: buf }).promise.then(function(pdf){
+        var pageNums = [];
+        for (var p = 1; p <= pdf.numPages; p++) pageNums.push(p);
+        var images = [];
+        function nextPage(idx){
+          if (idx >= pageNums.length) return Promise.resolve(images);
+          return pdf.getPage(pageNums[idx]).then(function(page){
+            var viewport = page.getViewport({ scale: 2 });
+            var canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            var ctx = canvas.getContext('2d');
+            return page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function(){
+              images.push(canvas);
+              setAkStatus('Reading PDF… page ' + (idx + 1) + ' of ' + pageNums.length, 'busy');
+              return nextPage(idx + 1);
+            });
+          });
+        }
+        return nextPage(0);
+      }).catch(function(err){
+        if (err && err.title) return Promise.reject(err);
+        return Promise.reject({ title: 'PDF cannot be read', message: 'The uploaded PDF could not be opened or parsed. It may be corrupted or password-protected.' });
+      });
+    });
+  }
+
+  /* ---- Step 3: OCR each page image with Tesseract.js ---- */
+  function ocrImages(canvases){
+    if (typeof Tesseract === 'undefined'){
+      return Promise.reject({ title: 'OCR extraction failed', message: 'The OCR engine failed to load. Check your connection and try again.' });
+    }
+    var fullText = '';
+    function nextImg(idx){
+      if (idx >= canvases.length) return Promise.resolve(fullText);
+      setAkStatus('Running OCR… page ' + (idx + 1) + ' of ' + canvases.length, 'busy');
+      return Tesseract.recognize(canvases[idx], 'eng').then(function(result){
+        fullText += '\n' + (result && result.data && result.data.text ? result.data.text : '');
+        var pct = Math.round(((idx + 1) / canvases.length) * 100);
+        setAkProgress(pct);
+        return nextImg(idx + 1);
+      }).catch(function(){
+        // A single page failing OCR shouldn't abort the whole key — continue with the rest.
+        return nextImg(idx + 1);
+      });
+    }
+    return nextImg(0);
+  }
+
+  /* ---- Step 4: parse OCR text into { questionId -> correctOption } ---- */
+  function parseAnswerKey(text){
+    var map = {};
+    if (!text || !text.trim()){
+      return map;
+    }
+    // Look for a "question id" (2-6 digits) followed, within a short gap of
+    // non-digit noise (OCR punctuation/whitespace/arrows/dashes), by a single
+    // digit 1-4 representing the correct option. Keep the first match per id.
+    var re = /(\d{2,6})[^\d]{0,20}?([1-4])(?!\d)/g;
+    var match;
+    while ((match = re.exec(text)) !== null){
+      var qid = match[1];
+      var opt = parseInt(match[2], 10);
+      if (!(qid in map)){
+        map[qid] = opt;
+      }
+    }
+    return map;
+  }
+
+  /* ---- Step 5: build the answer-key practice sheet ---- */
+  function buildAkSheet(){
+    akQlist.innerHTML = '';
+    akUserAnswers = {};
+    akQuestionIds.forEach(function(qid){
+      var row = document.createElement('div');
+      row.className = 'ak-q-row';
+      row.dataset.qid = qid;
+
+      var optsHtml = '';
+      for (var o = 1; o <= 4; o++){
+        optsHtml += '<input type="checkbox" class="ak-opt" data-opt="' + o + '" data-qid="' + qid + '" disabled>';
+      }
+
+      row.innerHTML =
+        '<div class="ak-q-num">ID ' + qid + '</div>' +
+        '<div class="ak-q-label">Question ' + qid + '</div>' +
+        '<div class="ak-options">' + optsHtml + '</div>' +
+        '<div class="ak-status-cell"><span class="ak-status-pill pending" data-pill="' + qid + '">Unattempted</span></div>';
+
+      akQlist.appendChild(row);
+    });
+
+    akSheetWrap.style.display = akQuestionIds.length ? 'block' : 'none';
+    akEmptyWrap.style.display = akQuestionIds.length ? 'none' : 'block';
+    akSummary.style.display = akQuestionIds.length ? 'grid' : 'none';
+    akScoreCard.style.display = akQuestionIds.length ? 'flex' : 'none';
+
+    updateAkSummary();
+  }
+
+  function updateAkSummary(){
+    var total = akQuestionIds.length;
+    var rightCount = 0, wrongCount = 0;
+    akQuestionIds.forEach(function(qid){
+      if (akUserAnswers.hasOwnProperty(qid)){
+        if (akUserAnswers[qid] === akAnswerKey[qid]) rightCount++;
+        else wrongCount++;
+      }
+    });
+    var pending = total - rightCount - wrongCount;
+
+    akRightCountEl.textContent = rightCount;
+    akWrongCountEl.textContent = wrongCount;
+    akPendingCountEl.textContent = pending;
+
+    var totalMarks = total * AK_MARKS_PER_Q;
+    akScoreValueEl.textContent = rightCount * AK_MARKS_PER_Q;
+    akScoreTotalEl.textContent = totalMarks;
+    var paperLabel = AK_PAPER_LABEL[akSelectedPaper] || 'Answer-key mode';
+    akScoreSubEl.textContent = AK_MARKS_PER_Q + ' marks per question · ' + paperLabel + ' · ' + total + ' of ' + akTotal + ' question(s) detected';
+  }
+
+  akQlist.addEventListener('change', function(e){
+    var target = e.target;
+    if (!target.classList || !target.classList.contains('ak-opt')) return;
+
+    var qid = target.dataset.qid;
+    var opt = parseInt(target.dataset.opt, 10);
+    var row = target.closest('.ak-q-row');
+    var pill = row.querySelector('.ak-status-pill');
+    var allOptsInRow = row.querySelectorAll('.ak-opt');
+
+    if (target.checked){
+      // enforce single-select per question: uncheck the other three
+      allOptsInRow.forEach(function(cb){
+        if (cb !== target) cb.checked = false;
+      });
+      // remove previous status, then revalidate the newly selected option
+      akUserAnswers[qid] = opt;
+      var correctOpt = akAnswerKey[qid];
+      var isCorrect = opt === correctOpt;
+      row.classList.toggle('ak-right', isCorrect);
+      row.classList.toggle('ak-wrong', !isCorrect);
+      pill.textContent = isCorrect ? 'Correct' : ('Wrong · Ans: ' + correctOpt);
+      pill.className = 'ak-status-pill ' + (isCorrect ? 'correct' : 'wrong');
+    } else {
+      // user unchecked their selected option -> question becomes unattempted again
+      var anyStillChecked = false;
+      allOptsInRow.forEach(function(cb){ if (cb.checked) anyStillChecked = true; });
+      if (!anyStillChecked){
+        delete akUserAnswers[qid];
+        row.classList.remove('ak-right', 'ak-wrong');
+        pill.textContent = 'Unattempted';
+        pill.className = 'ak-status-pill pending';
+      }
+    }
+
+    updateAkSummary();
+  });
+
+  /* ---- Orchestration ---- */
+  function setProcessing(state){
+    akProcessing = state;
+    akProcessBtn.disabled = state;
+    akFileInput.disabled = state;
+  }
+
+  akProcessBtn.addEventListener('click', function(){
+    if (akProcessing) return;
+
+    if (!akSelectedPaper){
+      showAkError('No paper selected', 'Please select Paper 1, Paper 2, or Full Test before uploading the answer key.');
+      return;
+    }
+
+    var file = akFileInput.files && akFileInput.files[0];
+
+    setProcessing(true);
+    setAkProgress(null);
+    setAkStatus('Validating file…', 'busy');
+
+    validateFile(file)
+      .then(function(validFile){
+        setAkStatus('Reading PDF…', 'busy');
+        return renderPdfToImages(validFile);
+      })
+      .then(function(canvases){
+        if (!canvases.length){
+          return Promise.reject({ title: 'PDF cannot be read', message: 'No pages were found in this PDF.' });
+        }
+        setAkStatus('Running OCR…', 'busy');
+        return ocrImages(canvases);
+      })
+      .then(function(text){
+        setAkStatus('Detecting Question IDs and correct options…', 'busy');
+        var map = parseAnswerKey(text);
+        var ids = Object.keys(map);
+        if (!ids.length){
+          return Promise.reject({
+            title: 'Answer key not recognized',
+            message: 'The uploaded PDF could not be recognized as a valid OCR answer key (no Question ID → correct option pairs were detected). Please upload the correct format.'
+          });
+        }
+
+        // Do not process or use answers beyond the selected paper's question limit.
+        ids.sort(function(a, b){ return parseInt(a, 10) - parseInt(b, 10); });
+        var cappedIds = ids.slice(0, akTotal);
+        var cappedMap = {};
+        cappedIds.forEach(function(id){ cappedMap[id] = map[id]; });
+
+        akAnswerKey = cappedMap;
+        akQuestionIds = cappedIds;
+        buildAkSheet();
+        setAkProgress(null);
+        setAkStatus('Answer Key Processed Successfully ✓', 'ok');
+
+        // Processing succeeded — do NOT start the exam/timer automatically.
+        // Show the pre-exam configuration step and wait for the user to
+        // pick a duration (or Infinite) and press Start.
+        showAkConfigPanel();
+      })
+      .catch(function(err){
+        setAkProgress(null);
+        var title = (err && err.title) || 'Upload error';
+        var message = (err && err.message) || 'Something went wrong while processing the answer key.';
+        setAkStatus('Could not process this file — see details.', 'err');
+        showAkError(title, message);
+      })
+      .finally(function(){
+        setProcessing(false);
+      });
+  });
+
+  /* ---------- Pre-exam configuration (duration / infinite / start) ---------- */
+  function showAkConfigPanel(){
+    resetAkConfigControls();
+    akUploadPanel.style.display = 'none';
+    akConfigPanel.style.display = 'block';
+    akTimerPanel.style.display = 'none';
+  }
+
+  akConfigInfiniteBtn.addEventListener('click', function(){
+    akConfigIsInfinite = !akConfigIsInfinite;
+    akConfigInfiniteBtn.classList.toggle('is-active', akConfigIsInfinite);
+    akConfigDurationSelect.disabled = akConfigIsInfinite;
+  });
+
+  akConfigStartBtn.addEventListener('click', function(){
+    if (!akQuestionIds.length) return;
+
+    akIsInfinite = akConfigIsInfinite;
+    if (akIsInfinite){
+      akUseHMS = false;
+      akSelectedDuration = 0;
+      akRemaining = 0;
+    } else {
+      var mins = parseInt(akConfigDurationSelect.value, 10);
+      akUseHMS = mins > 60;
+      akSelectedDuration = mins * 60;
+      akRemaining = akSelectedDuration;
+    }
+
+    // The examination begins only now, after the user has chosen a
+    // duration (or Infinite) and explicitly pressed Start.
+    akConfigPanel.style.display = 'none';
+    startAkExam();
+  });
+
+  /* ---------- AK timer (starts only via the Start button above) ---------- */
+  function akTick(){
+    if (akIsInfinite){
+      akRemaining += 1;
+      updateAkTimerUI();
+      return;
+    }
+    akRemaining -= 1;
+    if (akRemaining <= 0){
+      akRemaining = 0;
+      updateAkTimerUI();
+      endAkTimer(true);
+      return;
+    }
+    updateAkTimerUI();
+  }
+
+  function updateAkTimerUI(){
+    akTimerDisplay.textContent = formatAkTime(akRemaining);
+    if (akIsInfinite){
+      akTimerProgressBar.style.width = '100%';
+      akTimerDisplay.classList.remove('urgent');
+      akTimerProgressBar.classList.remove('urgent');
+      return;
+    }
+    var pct = akSelectedDuration ? Math.max(0, Math.min(100, ((akSelectedDuration - akRemaining) / akSelectedDuration) * 100)) : 0;
+    akTimerProgressBar.style.width = pct + '%';
+    var urgent = akRemaining <= 60 && akRemaining > 0 && akTimerState === 'running';
+    akTimerDisplay.classList.toggle('urgent', urgent);
+    akTimerProgressBar.classList.toggle('urgent', urgent);
+  }
+
+  function startAkExam(){
+    akTimerState = 'running';
+
+    akTimerPanel.style.display = 'block';
+    updateAkBadge();
+    akTimerStatus.textContent = akIsInfinite ? 'In progress · Infinite' : 'In progress';
+    akTimerStatus.className = 'timer-status is-running';
+    akTimerPanel.classList.add('is-live');
+    akPauseBtn.disabled = false;
+    akPauseBtn.textContent = 'Pause';
+    akEndBtn.disabled = false;
+
+    setAkLocked(false);
+    updateAkTimerUI();
+    clearInterval(akIntervalId);
+    akIntervalId = setInterval(akTick, 1000);
+  }
+
+  function pauseOrResumeAkTimer(){
+    if (akTimerState === 'running'){
+      clearInterval(akIntervalId);
+      akTimerState = 'paused';
+      akPauseBtn.textContent = 'Resume';
+      akTimerStatus.textContent = 'Paused';
+      akTimerStatus.className = 'timer-status is-paused';
+      akTimerPanel.classList.remove('is-live');
+      setAkLocked(true, 'Paused — resume the timer to keep marking answers');
+    } else if (akTimerState === 'paused'){
+      akTimerState = 'running';
+      akPauseBtn.textContent = 'Pause';
+      akTimerStatus.textContent = akIsInfinite ? 'In progress · Infinite' : 'In progress';
+      akTimerStatus.className = 'timer-status is-running';
+      akTimerPanel.classList.add('is-live');
+      setAkLocked(false);
+      akIntervalId = setInterval(akTick, 1000);
+    }
+  }
+
+  function endAkTimer(auto){
+    clearInterval(akIntervalId);
+    akTimerState = 'ended';
+    akPauseBtn.disabled = true;
+    akEndBtn.disabled = true;
+    akTimerStatus.className = 'timer-status is-ended';
+    akTimerPanel.classList.remove('is-live');
+    if (auto){
+      akTimerStatus.textContent = "Time's up";
+      setAkLocked(true, "Time's up! Review your marked answers below.");
+    } else {
+      akTimerStatus.textContent = 'Session ended';
+      setAkLocked(true, 'Session ended. Press Reset all to start a new attempt.');
+    }
+  }
+
+  function resetAkTimerState(){
+    clearInterval(akIntervalId);
+    akTimerState = 'idle';
+    akIsInfinite = false;
+    akUseHMS = false;
+    akSelectedDuration = 0;
+    akRemaining = 0;
+    akTimerDisplay.textContent = '00:00';
+    akTimerDisplay.classList.remove('urgent');
+    akTimerProgressBar.style.width = '0%';
+    akTimerProgressBar.classList.remove('urgent');
+    akTimerPanel.classList.remove('is-live');
+    akPauseBtn.disabled = true;
+    akPauseBtn.textContent = 'Pause';
+    akEndBtn.disabled = true;
+    setAkLocked(true, 'Select a paper and process the answer key to unlock marking');
+  }
+
+  akPauseBtn.addEventListener('click', pauseOrResumeAkTimer);
+  akEndBtn.addEventListener('click', function(){ endAkTimer(false); });
+
+  akResetBtn.addEventListener('click', function(){
+    // Full reset: back to paper selection, as if starting fresh.
+    resetAkTimerState();
+    akSelectedPaper = null;
+    akTotal = 0;
+    akAnswerKey = {};
+    akQuestionIds = [];
+    akUserAnswers = {};
+
+    akAllPaperBtns.forEach(function(b){ b.classList.remove('active'); });
+    akPaperNote.style.display = 'none';
+    akPaperNote.textContent = '';
+
+    akFileInput.value = '';
+    akFileLabel.classList.remove('has-file');
+    akFileLabelText.textContent = '📄 Choose answer-key PDF…';
+    setAkProgress(null);
+    setAkStatus('No answer key uploaded yet.', '');
+
+    resetAkConfigControls();
+    akUploadPanel.style.display = 'none';
+    akConfigPanel.style.display = 'none';
+    akTimerPanel.style.display = 'none';
+    akQlist.innerHTML = '';
+    akSummary.style.display = 'none';
+    akScoreCard.style.display = 'none';
+    akSheetWrap.style.display = 'none';
+    akEmptyWrap.style.display = 'block';
+  });
+
+  // Initial state: locked until a paper is selected and the key is processed.
+  setAkLocked(true, 'Select a paper and process the answer key to unlock marking');
+})();
+</script>
+
+</body>
+</html>
